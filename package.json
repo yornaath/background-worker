@@ -1,0 +1,49 @@
+{
+  "name": "background-worker",
+  "version": "0.0.1",
+  "description": "Execute tasks on web Workers without seperate files.",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gorillatron/background-worker.git"
+  },
+  "author": "Jørn Andre Tangen @gorillatron",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/gorillatron/background-worker/issues"
+  },
+  "homepage": "https://github.com/gorillatron/background-worker",
+  "dependencies": {
+    "underscore": "~1.6.0",
+    "bluebird": "^1.2.2",
+    "karma-browserify": "^0.2.0",
+    "karma-mocha": "^0.1.3",
+    "karma-expect": "^1.1.0"
+  },
+  "devDependencies": {
+    "browserify": "^3.41.0",
+    "mocha": "~1.17.1",
+    "karma-mocha": "~0.1.1",
+    "karma-script-launcher": "~0.1.0",
+    "karma-chrome-launcher": "~0.1.2",
+    "karma-firefox-launcher": "~0.1.3",
+    "karma-html2js-preprocessor": "~0.1.0",
+    "karma-jasmine": "~0.1.5",
+    "karma-requirejs": "~0.2.1",
+    "karma-coffee-preprocessor": "~0.1.3",
+    "karma-phantomjs-launcher": "~0.1.2",
+    "karma": "~0.10.9",
+    "karma-expect": "~1.0.0",
+    "sinon": "~1.8.2",
+    "karma-sinon": "~1.0.2",
+    "browserify": "~3.30.2",
+    "karma-browserify": "~0.1.0",
+    "karma-osx-reporter": "0.0.4"
+  }
+}
