@@ -1,10 +1,12 @@
+"use strict";
+
 var _                 = require( 'underscore' ),
     Promise           = require( 'bluebird' ),
     inherits          = require( 'util' ) .inherits,
     EventEmitter      = require( 'events' ).EventEmitter
 
 
-const global = global || window
+var global = global || window
 
 module.exports = BackgroundWorker
 
