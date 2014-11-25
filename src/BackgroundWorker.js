@@ -6,7 +6,6 @@ var _                 = require( 'underscore' ),
     EventEmitter      = require( 'events' ).EventEmitter
 
 
-var global = global || window
 
 module.exports = BackgroundWorker
 
@@ -24,12 +23,15 @@ function BackgroundWorker( spec ) {
   this.definitions = spec.definitions || []
   this.domain = spec.domain || (location.protocol + "//" + location.host)
 
+  this._spec = spec
   this._worker = null
   this._iframe = null
   this._messageId = 0
   this._messagehandlers = {}
   this._state = BackgroundWorker.CREATED
-  this._isStarted = false
+
+  if( typeof spec === 'function' )
+    this.define('default', spec )
 }
 
 inherits( BackgroundWorker, EventEmitter )
@@ -43,72 +45,186 @@ BackgroundWorker.hasWorkerSupport = function() {
   return (typeof window.Worker !== 'undefined' && typeof window.Blob !== 'undefined') && (typeof window.URL.createObjectURL == 'function')
 }
 
+/*
+* State Created
+* @static
+*/
 BackgroundWorker.CREATED = {}
 
+/*
+* State Running
+* @static
+*/
 BackgroundWorker.RUNNING = {}
 
+/*
+* State Idle
+* @static
+*/
 BackgroundWorker.IDLE = {}
 
+/*
+* State Terminated
+* @static
+*/
 BackgroundWorker.TERMINATED = {}
 
 /*
- * Start the worker
+ * Define a command on the worker
  * @public
  * @function
 */
-BackgroundWorker.prototype.start = function() {
-  if( this._isStarted )
-    throw new Error( 'cannot start allready started BackgroundWorker' )
+BackgroundWorker.prototype.define = function( key, val ) {
+  this.definitions.push({ key: key, val: val })
+}
 
-  this._isStarted = true
+/*
+ * Run a given function defined in the BackgroundWorker
+ * @public
+ * @function
+ * @param {string} command - command to run
+ * @param {array} args - arguemnts to apply to command
+ * @returns {Promise}
+*/
+BackgroundWorker.prototype.run = function( command, args ) {
+  var self, messageId, message, handler, task, worker
+
+  self = this
+
+  if( typeof command !== 'string' ) {
+    command = 'default'
+    args = Array.prototype.slice.call( self )
+  }
+
+  if( self._state === BackgroundWorker.TERMINATED ) {
+    throw new Error( 'Cannot call run on a Terminated BackgroundWorker' )
+  }
+
+  if(!self._isStarted)
+    start( self )
+
+  stateChange( self, BackgroundWorker.RUNNING )
+
+  messageId = getUniqueMessageId( self )
+  message = { command: command, args: args, messageId: messageId }
+
+  handler = {}
+
+  function setIdleThen(cb) {
+    return function(){
+      stateChange( self, BackgroundWorker.IDLE )
+      cb.apply( self, arguments )
+    }
+  }
+
+  task = new Promise(function(resolve, reject) {
+    handler.resolve = setIdleThen(resolve)
+    handler.reject = setIdleThen(reject)
+  })
+
+  self._messagehandlers[ messageId ] = handler
 
   if( BackgroundWorker.hasWorkerSupport() ) {
-    this.setupWebWorker()
+    self._worker.postMessage( JSON.stringify(message) )
   }
   else {
-    this.setupIframe()
+    self._iframe.contentWindow.postMessage( JSON.stringify(message), self.domain )
   }
-  return this
+
+  return task
 }
 
 /*
- * Setup a Worker
- * @public
- * @function
+* Terminate the worker
+* @public
+* @function
 */
-BackgroundWorker.prototype.setupWebWorker = function() {
-  this.blob = new Blob([
-    this.getWorkerSourcecode()
+BackgroundWorker.prototype.terminate = function() {
+  var self
+
+  self = this
+
+  if( BackgroundWorker.hasWorkerSupport() ) {
+    if( self._worker )
+      self._worker.terminate()
+  }
+  else if( self._iframe ){
+    self._iframe.remove()
+  }
+  stateChange( self, BackgroundWorker.TERMINATED )
+}
+
+/*
+* Global reference
+* @private
+*/
+var global = global || window
+
+/*
+* Start the worker
+* @private
+* @function
+*/
+function start( self ) {
+  if( self._isStarted )
+  throw new Error( 'cannot start allready started BackgroundWorker' )
+
+  self._isStarted = true
+
+  if( BackgroundWorker.hasWorkerSupport() ) {
+    setupWebWorker( self )
+  }
+  else {
+    setupIframe( self )
+  }
+
+  stateChange( self, BackgroundWorker.IDLE )
+
+  return self
+}
+
+/*
+* Setup a Worker
+* @private
+* @function
+*/
+function setupWebWorker( self ) {
+  self.blob = new Blob([
+    getWorkerSourcecode( self )
   ], { type: "text/javascript" })
 
-  this._worker = new Worker( window.URL.createObjectURL(this.blob) )
+  self._worker = new Worker( window.URL.createObjectURL(self.blob) )
 
-  this._worker.onmessage = _.bind( this.workerOnMessageHandler, this )
-  this._worker.onerror = _.bind( this.workerOnErrorHandler, this )
+  self._worker.onmessage = function( event ) {
+    return workerOnMessageHandler( self, event )
+  }
+  self._worker.onerror = function( event )  {
+    return workerOnErrorHandler( self, event )
+  }
 }
 
 /*
- * Setup a Iframe
- * @public
- * @function
+* Setup a Iframe
+* @private
+* @function
 */
-BackgroundWorker.prototype.setupIframe = function() {
+function setupIframe( self ) {
   var script, src
 
-  this._iframe = document.createElement( 'iframe' )
+  self._iframe = document.createElement( 'iframe' )
 
   script = document.createElement( 'script' )
 
-  if( !this._iframe.style ) this._iframe.style = {}
-  this._iframe.style.display = 'none';
+  if( !self._iframe.style ) self._iframe.style = {}
+  self._iframe.style.display = 'none';
 
   src = ""
 
-  src += "var domain = '" + this.domain + "';\n"
-  src += "var importScripts = " + JSON.stringify(this.importScripts) + ";\n"
+  src += "var domain = '" + self.domain + "';\n"
+  src += "var importScripts = " + JSON.stringify(self.importScripts) + ";\n"
   src += "var definitions = {};\n"
 
-  _.forEach(this.definitions, function( definition ) {
+  _.forEach(self.definitions, function( definition ) {
     src += " definitions['" + definition.key + "'] = " + definition.val + ";\n"
   })
 
@@ -138,7 +254,7 @@ BackgroundWorker.prototype.setupIframe = function() {
       var data = JSON.parse(event.data);
       loadScripts(function() {
         if( data.result )
-          return
+        return
         try {
           var result = definitions[data.command].apply(this, data.args);
           var out = { messageId: data.messageId, result: result };
@@ -156,80 +272,30 @@ BackgroundWorker.prototype.setupIframe = function() {
 
   script.innerHTML = src
 
-  window.document.body.appendChild( this._iframe )
+  window.document.body.appendChild( self._iframe )
 
-  this._iframe.contentWindow.addEventListener( 'message', _.bind( this.iframeOnMessageHandler, this ) )
+  self._iframe.contentWindow.addEventListener( 'message', function( event ){ return iframeOnMessageHandler( self, event ) } )
 
-  this._iframe.contentDocument.body.appendChild( script )
+  self._iframe.contentDocument.body.appendChild( script )
 
 }
 
 /*
- * Terminate the worker
- * @public
- * @function
+* Get a uniqie messageid to identify a worker message transaction
+* @private
+* @function
+* @returns {int}
 */
-BackgroundWorker.prototype.terminate = function() {
-  if( BackgroundWorker.hasWorkerSupport() ) {
-    if( !this._worker )
-      throw new Error('BackgroundWorker has no worker to terminate')
-    return this._worker.terminate()
-  }
-  else if( this._iframe ){
-    this._iframe.remove()
-  }
+function getUniqueMessageId( self ) {
+  return self._messageId++
 }
 
-/*
- * Get a uniqie messageid to identify a worker message transaction
- * @public
- * @function
- * @returns {int}
-*/
-BackgroundWorker.prototype.getUniqueMessageId = function() {
-  return this._messageId++
-}
-
-/*
- * Define a command on the worker
- * @public
- * @function
-*/
-BackgroundWorker.prototype.define = function( key, val ) {
-  this.definitions.push({ key: key, val: val })
-}
-
-/*
- * Run a given function defined in the BackgroundWorker
- * @public
- * @function
- * @param {string} command - command to run
- * @param {array} args - arguemnts to apply to command
- * @returns {Promise}
-*/
-BackgroundWorker.prototype.run = function( command, args ) {
-  var messageId, message, handler, task, worker
-
-  messageId = this.getUniqueMessageId()
-  message = { command: command, args: args, messageId: messageId }
-
-  handler = {}
-
-  task = new Promise(function(resolve, reject) {
-    handler.resolve = resolve
-    handler.reject = reject
-  })
-
-  this._messagehandlers[ messageId ] = handler
-
-  if( BackgroundWorker.hasWorkerSupport() ) {
-    this._worker.postMessage( JSON.stringify(message) )
+function stateChange( self, newstate ) {
+  var oldstate = self._state
+  self._state = newstate
+  if( oldstate !== newstate ) {
+    self.emit( 'statechange:' + newstate )
   }
-  else {
-    this._iframe.contentWindow.postMessage( JSON.stringify(message), this.domain )
-  }
-
-  return task
 }
 
 /*
@@ -238,15 +304,15 @@ BackgroundWorker.prototype.run = function( command, args ) {
  * @function
  * @event
 */
-BackgroundWorker.prototype.workerOnMessageHandler = function( event ) {
+function workerOnMessageHandler( self, event ) {
   var data, messagehandler
 
   data = JSON.parse( event.data )
 
-  messagehandler = this._messagehandlers[ data.messageId ]
+  messagehandler = self._messagehandlers[ data.messageId ]
 
   if( data.exception )
-    return messagehandler.reject( this.createExceptionFromMessage( data.exception ) )
+    return messagehandler.reject( createExceptionFromMessage( self, data.exception ) )
 
   messagehandler.resolve( data.result )
 }
@@ -257,17 +323,17 @@ BackgroundWorker.prototype.workerOnMessageHandler = function( event ) {
  * @function
  * @event
 */
-BackgroundWorker.prototype.iframeOnMessageHandler = function( event ) {
+ function iframeOnMessageHandler( self, event ) {
   var data, messagehandler
 
   data = JSON.parse( event.data )
 
   if(data.command) return null
 
-  messagehandler = this._messagehandlers[ data.messageId ]
+  messagehandler = self._messagehandlers[ data.messageId ]
 
   if( data.exception )
-    return messagehandler.reject( this.createExceptionFromMessage( data.exception ) )
+    return messagehandler.reject( createExceptionFromMessage( self, data.exception ) )
 
   messagehandler.resolve( data.result )
 
@@ -276,14 +342,14 @@ BackgroundWorker.prototype.iframeOnMessageHandler = function( event ) {
 
 /*
  * Create a exception by an obect describing it
- * @public
+ * @private
  * @function
  * @param {object} exception
  * @param {string} exception.type
  * @param {string} exception.message
  * @returns {Error}
 */
-BackgroundWorker.prototype.createExceptionFromMessage = function( exception ) {
+function createExceptionFromMessage( self, exception ) {
   var type, message
 
   try {
@@ -300,11 +366,11 @@ BackgroundWorker.prototype.createExceptionFromMessage = function( exception ) {
 
 /*
  * Handle worker error
- * @public
+ * @private
  * @function
  * @event
 */
-BackgroundWorker.prototype.workerOnErrorHandler = function( event ) {
+ function workerOnErrorHandler( self, event ) {
   var message, error, errorType, errorMessage
 
   event.preventDefault()
@@ -323,26 +389,26 @@ BackgroundWorker.prototype.workerOnErrorHandler = function( event ) {
 
   error = new errorType( errorMessage )
 
-  this.emit( 'exception', error )
+  self.emit( 'exception', error )
 }
 
 /*
  * Get the sourcecode for this worker
- * @public
+ * @private
  * @function
  * @returns {string}
 */
-BackgroundWorker.prototype.getWorkerSourcecode = function() {
+function getWorkerSourcecode( self ) {
   var src
 
   src = ""
 
-  if( this.importScripts.length )
-    src += "importScripts( '" + this.importScripts.join("','") + "' );\n"
+  if( self.importScripts.length )
+    src += "importScripts( '" + self.importScripts.join("','") + "' );\n"
 
   src += " var definitions = {};"
 
-  _.forEach(this.definitions, function( definition ) {
+  _.forEach(self.definitions, function( definition ) {
     src += " definitions['" + definition.key + "'] = " + definition.val + ";"
   })
 

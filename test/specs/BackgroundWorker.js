@@ -3,46 +3,13 @@ var BackgroundWorker = require( '../../' )
 
 describe( 'BackgroundWorker', function() {
 
-  describe( 'BackgroundWorker#start', function() {
+  describe( 'WebWorker', function() {
 
-    it( 'should throw exepction if tried to start when allready started', function() {
-      var worker
-
-      worker = new BackgroundWorker()
-
-      worker.start()
-
-      expect(function(){ worker.start() })
-        .to.throwException()
-    })
+    TestSharedAPI()
 
   })
 
-  describe( 'Exceptions', function() {
-
-    it('should throw correct typeof exception', function( done ) {
-      var worker
-
-      worker = new BackgroundWorker()
-
-      worker.define('TypeError', function(){ throw new TypeError() })
-      worker.define('SyntaxError', function(){ throw new SyntaxError() })
-
-      worker.start()
-
-      worker.run('SyntaxError').catch(function( error ) {
-        expect( error ).to.be.a(SyntaxError)
-        worker.run('TypeError').catch(function( error ) {
-          expect( error ).to.be.a(TypeError)
-          done()
-        })
-      })
-
-    })
-
-  })
-
-  describe( 'Running in Iframe', function( done ) {
+  describe( 'Iframe', function() {
 
     before(function() {
       BackgroundWorker._oriHasWorkerSupport = BackgroundWorker.hasWorkerSuppor
@@ -53,18 +20,93 @@ describe( 'BackgroundWorker', function() {
       BackgroundWorker.hasWorkerSupport = BackgroundWorker._oriHasWorkerSupport
     })
 
-    it('Should run', function( done ) {
+    TestSharedAPI()
+
+  })
+
+})
+
+function TestSharedAPI(){
+
+  describe( 'BackgroundWorker#run', function(){
+
+    it('should run predefined functions', function( done ){
       var worker
 
       worker = new BackgroundWorker()
 
-      worker.define('job', function(){ return 'ran' }.toString())
+      worker.define('add', function( a, b ){ return a + b })
+      worker.define('sub', function( a, b ){ return a - b })
 
-      worker.start()
+      Promise.all([
+        worker.run('add', [1, 2]),
+        worker.run('sub', [5, 4])
+        ]).then(function( results ) {
+          expect(results[0]).to.equal( 3 )
+          expect(results[1]).to.equal( 1 )
+          done()
+        })
+      })
 
-      worker.run('job').then(function( res ) {
-        expect(res).to.equal('ran')
-        done()
+      it('should run first argument as default function if first argument is a function to constructor', function( done ) {
+        var worker
+
+        worker = new BackgroundWorker(function() {
+          return "default"
+        })
+
+        worker.define('other', function(){
+          return "other"
+        })
+
+        worker.run().then(function( result ) {
+          expect( result ).to.equal( "default" )
+          worker.run('other').then(function( result ) {
+            expect( result ).to.equal( "other" )
+            done()
+          })
+        })
+
+      })
+
+    })
+
+    describe('BackgroundWorker#terminate', function() {
+
+      it('should not throw exception of trying to run a terminated worker', function() {
+        var worker
+
+        worker = new BackgroundWorker()
+
+        worker.terminate()
+
+        expect(function(){
+          worker.run()
+        }).to.throwException(function (e) {
+          expect(e.message.toLowerCase().match('terminated')).to.be.ok()
+        });
+      })
+
+    })
+
+    describe( 'Exceptions', function() {
+
+      it('should throw correct typeof exception', function( done ) {
+        var worker
+
+        worker = new BackgroundWorker()
+
+        worker.define('TypeError', function(){ throw new TypeError() })
+        worker.define('SyntaxError', function(){ throw new SyntaxError() })
+
+        worker.run('SyntaxError').catch(function( error ) {
+          expect( error ).to.be.a(SyntaxError)
+          worker.run('TypeError').catch(function( error ) {
+            expect( error ).to.be.a(TypeError)
+            done()
+          })
+        })
+
       })
 
     })
@@ -78,14 +120,9 @@ describe( 'BackgroundWorker', function() {
 
       worker.define('func', function(){ return importedFunc() }.toString())
 
-      worker.start()
-
       worker.run('func').then(function( res ) {
         expect(res).to.equal('imported')
         done()
       })
     })
-
-  })
-
-})
+  }
