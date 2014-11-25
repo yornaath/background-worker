@@ -100,7 +100,7 @@ BackgroundWorker.prototype.run = function( command, args ) {
     throw new Error( 'Cannot call run on a Terminated BackgroundWorker' )
   }
 
-  if(!self._isStarted)
+  if( !self._isStarted )
     start( self )
 
   stateChange( self, BackgroundWorker.RUNNING )
@@ -110,16 +110,15 @@ BackgroundWorker.prototype.run = function( command, args ) {
 
   handler = {}
 
-  function setIdleThen(cb) {
-    return function(){
-      stateChange( self, BackgroundWorker.IDLE )
-      cb.apply( self, arguments )
-    }
-  }
-
   task = new Promise(function(resolve, reject) {
-    handler.resolve = setIdleThen(resolve)
-    handler.reject = setIdleThen(reject)
+    function setIdleThen(cb) {
+      return function(){
+        stateChange( self, BackgroundWorker.IDLE )
+        cb.apply( self, arguments )
+      }
+    }
+    handler.resolve = setIdleThen( resolve )
+    handler.reject = setIdleThen( reject )
   })
 
   self._messagehandlers[ messageId ] = handler
@@ -290,12 +289,23 @@ function getUniqueMessageId( self ) {
   return self._messageId++
 }
 
+/*
+* Change state of BackgroundWorker and trigger event if it differs from old
+* @private
+* @function
+*/
 function stateChange( self, newstate ) {
-  var oldstate = self._state
+  var oldstate
+
+  oldstate = self._state
   self._state = newstate
+
   if( oldstate !== newstate ) {
     self.emit( 'statechange:' + newstate )
+    return true
   }
+
+  return false
 }
 
 /*
