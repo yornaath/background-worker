@@ -276,7 +276,7 @@ BackgroundWorker.prototype.createExceptionFromMessage = function( exception ) {
   var type, message
 
   try {
-    type = typeof eval( exception.type ) == 'function' ? eval( exception.type ) : Error
+    type = typeof global[exception.type] == 'function' ? global[exception.type] : Error
   }
   catch( exception ) {
     type = Error

@@ -18,6 +18,30 @@ describe( 'BackgroundWorker', function() {
 
   })
 
+  describe( 'Exceptions', function() {
+
+    it('should throw correct typeof exception', function( done ) {
+      var worker
+
+      worker = new BackgroundWorker()
+
+      worker.define('TypeError', function(){ throw new TypeError() })
+      worker.define('SyntaxError', function(){ throw new SyntaxError() })
+
+      worker.start()
+
+      worker.run('SyntaxError').catch(function( error ) {
+        expect( error ).to.be.a(SyntaxError)
+        worker.run('TypeError').catch(function( error ) {
+          expect( error ).to.be.a(TypeError)
+          done()
+        })
+      })
+
+    })
+
+  })
+
   describe( 'Running in Iframe', function( done ) {
 
     before(function() {
@@ -56,9 +80,7 @@ describe( 'BackgroundWorker', function() {
 
       worker.start()
 
-      console.log('RUN')
       worker.run('func').then(function( res ) {
-        console.log('RAN')
         expect(res).to.equal('imported')
         done()
       })
