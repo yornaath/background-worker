@@ -4,6 +4,8 @@ var _                 = require( 'underscore' ),
     EventEmitter      = require( 'events' ).EventEmitter
 
 
+const global = global || window
+
 module.exports = BackgroundWorker
 
 /*
