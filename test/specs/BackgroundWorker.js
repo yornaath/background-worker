@@ -1,4 +1,4 @@
-var BackgroundWorker = require( '../' )
+var BackgroundWorker = require( '../../' )
 
 
 describe( 'BackgroundWorker', function() {
@@ -49,14 +49,16 @@ describe( 'BackgroundWorker', function() {
       var worker
 
       worker = new BackgroundWorker({
-        importScripts: [location.protocol + "//" + location.host + "/base/test/import.js"],
+        importScripts: [location.protocol + "//" + location.host + "/base/test/assets/import.js"],
       })
 
       worker.define('func', function(){ return importedFunc() }.toString())
 
       worker.start()
 
+      console.log('RUN')
       worker.run('func').then(function( res ) {
+        console.log('RAN')
         expect(res).to.equal('imported')
         done()
       })
