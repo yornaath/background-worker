@@ -157,7 +157,7 @@ BackgroundWorker.prototype.terminate = function() {
 * Global reference
 * @private
 */
-var global = global || window
+var global = typeof global !== 'undefined' ? global : window
 
 /*
 * Start the worker
