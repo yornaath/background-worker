@@ -9,7 +9,7 @@ module.exports = function(config) {
 
 
     // frameworks to use
-    frameworks: [ 'mocha', 'expect', 'browserify', 'sinon' ],
+    frameworks: [ 'mocha', 'expect', 'browserify' ],
 
     browserify: {
       watch: true

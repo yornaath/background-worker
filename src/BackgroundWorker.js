@@ -1,7 +1,6 @@
 "use strict";
 
-var _                 = require( 'underscore' ),
-    Promise           = require( 'bluebird' ),
+var Promise           = require( 'bluebird' ),
     inherits          = require( 'util' ) .inherits,
     EventEmitter      = require( 'events' ).EventEmitter
 
@@ -223,9 +222,12 @@ function setupIframe( self ) {
   src += "var importScripts = " + JSON.stringify(self.importScripts) + ";\n"
   src += "var definitions = {};\n"
 
-  _.forEach(self.definitions, function( definition ) {
-    src += " definitions['" + definition.key + "'] = " + definition.val + ";\n"
-  })
+
+  for (var i = 0; i < self.definitions.length; i++) {
+    var key = self.definitions[i].key
+    var val = self.definitions[i].val
+    src += " definitions['" + key + "'] = " + val + ";\n"
+  }
 
   src += ";(" + function(){
 
@@ -418,9 +420,11 @@ function getWorkerSourcecode( self ) {
 
   src += " var definitions = {};"
 
-  _.forEach(self.definitions, function( definition ) {
-    src += " definitions['" + definition.key + "'] = " + definition.val + ";"
-  })
+  for (var i = 0; i < self.definitions.length; i++) {
+    var key = self.definitions[i].key
+    var val = self.definitions[i].val
+    src += " definitions['" + key + "'] = " + val + ";"
+  }
 
   src += "self.onmessage = function( event ) {  " +
            "var data = JSON.parse(event.data);" +

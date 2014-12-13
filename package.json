@@ -20,8 +20,7 @@
   },
   "homepage": "https://github.com/gorillatron/background-worker",
   "dependencies": {
-    "bluebird": "^2.3.11",
-    "underscore": "^1.7.0"
+    "bluebird": "^2.3.11"
   },
   "devDependencies": {
     "karma": "^0.12.25",
