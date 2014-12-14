@@ -5,7 +5,6 @@ var Promise           = require( 'bluebird' ),
     EventEmitter      = require( 'events' ).EventEmitter
 
 
-
 module.exports = BackgroundWorker
 
 /*
@@ -99,8 +98,9 @@ BackgroundWorker.prototype.run = function( command, args ) {
     throw new Error( 'Cannot call run on a Terminated BackgroundWorker' )
   }
 
-  if( !self._isStarted )
+  if( !self._isStarted ) {
     start( self )
+  }
 
   stateChange( self, BackgroundWorker.RUNNING )
 
@@ -164,8 +164,9 @@ var global = typeof global !== 'undefined' ? global : window
 * @function
 */
 function start( self ) {
-  if( self._isStarted )
-  throw new Error( 'cannot start allready started BackgroundWorker' )
+  if( self._isStarted ) {
+    throw new Error( 'cannot start allready started BackgroundWorker' )
+  }
 
   self._isStarted = true
 
@@ -223,10 +224,8 @@ function setupIframe( self ) {
   src += "var definitions = {};\n"
 
 
-  for (var i = 0; i < self.definitions.length; i++) {
-    var key = self.definitions[i].key
-    var val = self.definitions[i].val
-    src += " definitions['" + key + "'] = " + val + ";\n"
+  for( var i = 0; i < self.definitions.length; i++ ) {
+    src += " definitions['" + self.definitions[i].key + "'] = " + self.definitions[i].val + ";\n"
   }
 
   src += ";(" + function(){
@@ -415,15 +414,14 @@ function getWorkerSourcecode( self ) {
 
   src = ""
 
-  if( self.importScripts.length )
+  if( self.importScripts.length ) {
     src += "importScripts( '" + self.importScripts.join("','") + "' );\n"
+  }
 
   src += " var definitions = {};"
 
-  for (var i = 0; i < self.definitions.length; i++) {
-    var key = self.definitions[i].key
-    var val = self.definitions[i].val
-    src += " definitions['" + key + "'] = " + val + ";"
+  for( var i = 0; i < self.definitions.length; i++ ) {
+    src += " definitions['" + self.definitions[i].key + "'] = " + self.definitions[i].val + ";\n"
   }
 
   src += "self.onmessage = function( event ) {  " +
