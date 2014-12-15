@@ -146,23 +146,6 @@ BackgroundWorker.prototype.run = function( command, args ) {
 }
 
 /*
-* PostMessage to the underlying Worker implementation
-* @private
-* @function
-*/
-function postMessage( self, message, domain ) {
-  if( isNode ) {
-    self._childProcess.send( message )
-  }
-  else if( BackgroundWorker.hasWorkerSupport() ) {
-    self._worker.postMessage( message )
-  }
-  else {
-    self._iframe.contentWindow.postMessage( message, self.domain )
-  }
-}
-
-/*
 * Terminate the worker
 * @public
 * @function
@@ -229,6 +212,23 @@ function start( self ) {
   stateChange( self, BackgroundWorker.IDLE )
 
   return self
+}
+
+/*
+* PostMessage to the underlying Worker implementation
+* @private
+* @function
+*/
+function postMessage( self, message, domain ) {
+  if( isNode ) {
+    self._childProcess.send( message )
+  }
+  else if( BackgroundWorker.hasWorkerSupport() ) {
+    self._worker.postMessage( message )
+  }
+  else {
+    self._iframe.contentWindow.postMessage( message, self.domain )
+  }
 }
 
 /*
