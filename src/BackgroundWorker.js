@@ -371,6 +371,7 @@ function stateChange( self, newstate ) {
 
   if( oldstate !== newstate ) {
     self.emit( 'statechange:' + newstate )
+    self.emit( 'statechange', newstate )
     return true
   }
 
