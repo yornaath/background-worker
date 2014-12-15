@@ -89,6 +89,41 @@ function TestSharedAPI(){
 
     })
 
+    describe( 'States', function() {
+
+      it('Should be BackgroundWorker.CREATED for newly created workers', function() {
+        var worker = new BackgroundWorker()
+        expect( worker._state ).to.eql( BackgroundWorker.CREATED )
+      })
+
+      it('Should be BackgroundWorker.IDLE for started workers', function() {
+        var worker = new BackgroundWorker()
+        worker._start()
+        expect( worker._state ).to.eql( BackgroundWorker.CREATED )
+        worker.terminate()
+      })
+
+      it('Should be BackgroundWorker.RUNNING for workers executing work', function( done ) {
+        var worker = new BackgroundWorker()
+        worker.define( 'fn', "function(){ return 'wat' }" )
+        expect( worker._state ).to.eql( BackgroundWorker.CREATED )
+        worker.run('fn').finally( done )
+        expect( worker._state ).to.eql( BackgroundWorker.RUNNING )
+      })
+
+      it('Should be BackgroundWorker.IDLE for after done working', function( done ) {
+        var worker = new BackgroundWorker()
+        worker.define( 'fn', "function(){ return 'wat' }" )
+        expect( worker._state ).to.eql( BackgroundWorker.CREATED )
+        worker.run('fn').finally(function() {
+          expect( worker._state ).to.eql( BackgroundWorker.IDLE )
+          done()
+        })
+        expect( worker._state ).to.eql( BackgroundWorker.RUNNING )
+      })
+
+    })
+
     describe( 'Exceptions', function() {
 
       it('should throw correct typeof exception', function( done ) {
