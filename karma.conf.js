@@ -21,7 +21,7 @@ module.exports = function(config) {
 
     // list of files / patterns to load in the browser
     files: [
-      'test/**/*.js',
+      'test/specs/BackgroundWorker.browser.js',
       { pattern: 'test/assets/**/*', included: false, served: true }
     ],
 

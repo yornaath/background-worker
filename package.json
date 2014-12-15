@@ -1,13 +1,13 @@
 {
   "name": "background-worker",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Execute tasks on Web Workers without seperate files.",
   "main": "index.js",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "test": "./node_modules/karma/bin/karma start karma.conf.js --single-run true"
+    "test": "echo '----RUNNING BROWSER TESTS----: \n' && ./node_modules/karma/bin/karma start karma.conf.js --single-run true && echo '\n ----RUNNING NODE TESTS---: \n' && node_modules/mocha/bin/mocha test/specs/BackgroundWorker.node.js"
   },
   "repository": {
     "type": "git",
@@ -20,14 +20,17 @@
   },
   "homepage": "https://github.com/gorillatron/background-worker",
   "dependencies": {
-    "bluebird": "^2.3.11"
+    "bluebird": "^2.3.11",
+    "detect-node": "^2.0.3"
   },
   "devDependencies": {
+    "expect.js": "^0.3.1",
     "karma": "^0.12.25",
     "karma-browserify": "^1.0.0",
     "karma-chrome-launcher": "^0.1.5",
     "karma-expect": "^1.1.0",
     "karma-mocha": "^0.1.9",
+    "karma-osx-reporter": "^0.1.0",
     "mocha": "^2.0.1"
   }
 }

@@ -1,6 +1,9 @@
 "use strict";
 
 var Promise           = require( 'bluebird' ),
+    path              = require( 'path' ),
+    child_process     = require( 'child_process' ),
+    isNode            = require( 'detect-node' ),
     inherits          = require( 'util' ) .inherits,
     EventEmitter      = require( 'events' ).EventEmitter
 
@@ -19,7 +22,7 @@ function BackgroundWorker( spec ) {
 
   this.importScripts = spec.importScripts || []
   this.definitions = spec.definitions || []
-  this.domain = spec.domain || (location.protocol + "//" + location.host)
+  this.domain =  spec.domain || !isNode ? (location.protocol + "//" + location.host) : null
 
   this._spec = spec
   this._worker = null
@@ -28,8 +31,9 @@ function BackgroundWorker( spec ) {
   this._messagehandlers = {}
   this._state = BackgroundWorker.CREATED
 
-  if( typeof spec === 'function' )
+  if( typeof spec === 'function' ) {
     this.define('default', spec )
+  }
 }
 
 inherits( BackgroundWorker, EventEmitter )
@@ -42,6 +46,20 @@ inherits( BackgroundWorker, EventEmitter )
 BackgroundWorker.hasWorkerSupport = function() {
   return (typeof window.Worker !== 'undefined' && typeof window.Blob !== 'undefined') && (typeof window.URL.createObjectURL == 'function')
 }
+
+/*
+* Check support for passing complex structures. Value is memoized
+* @static
+* @returns {boolean}
+*/
+BackgroundWorker.hasStructuredCloneSupport = memoize(function() {
+  try {
+    window.postMessage( document.createElement("a"),"*" )
+    return true
+  } catch( exception ) {
+    return exception.DATA_CLONE_ERR ? false : true;
+  }
+})
 
 /*
 * State Created
@@ -122,14 +140,21 @@ BackgroundWorker.prototype.run = function( command, args ) {
 
   self._messagehandlers[ messageId ] = handler
 
-  if( BackgroundWorker.hasWorkerSupport() ) {
-    self._worker.postMessage( JSON.stringify(message) )
-  }
-  else {
-    self._iframe.contentWindow.postMessage( JSON.stringify(message), self.domain )
-  }
+  postMessage( self, message, self.domain )
 
   return task
+}
+
+function postMessage( self, message, domain ) {
+  if( isNode ) {
+    self._childProcess.send( message )
+  }
+  else if( BackgroundWorker.hasWorkerSupport() ) {
+    self._worker.postMessage( message )
+  }
+  else {
+    self._iframe.contentWindow.postMessage( message, self.domain )
+  }
 }
 
 /*
@@ -142,21 +167,36 @@ BackgroundWorker.prototype.terminate = function() {
 
   self = this
 
-  if( BackgroundWorker.hasWorkerSupport() ) {
+  if( isNode ) {
+    if( self._childProcess ) self._childProcess.kill()
+  }
+  else if( BackgroundWorker.hasWorkerSupport() ) {
     if( self._worker )
       self._worker.terminate()
   }
   else if( self._iframe ){
     self._iframe.remove()
   }
+
   stateChange( self, BackgroundWorker.TERMINATED )
+}
+
+/*
+* Start the worker. Should not be called by the user.
+* @public
+* @function
+*/
+BackgroundWorker.prototype._start = function() {
+  return start( this )
 }
 
 /*
 * Global reference
 * @private
 */
-var global = typeof global !== 'undefined' ? global : window
+
+var global = typeof global !== 'undefined' ? global :
+             typeof window !== 'undefined' ? window : this
 
 /*
 * Start the worker
@@ -170,7 +210,10 @@ function start( self ) {
 
   self._isStarted = true
 
-  if( BackgroundWorker.hasWorkerSupport() ) {
+  if( isNode ) {
+    setupChildProcess( self )
+  }
+  else if( BackgroundWorker.hasWorkerSupport() ) {
     setupWebWorker( self )
   }
   else {
@@ -180,6 +223,32 @@ function start( self ) {
   stateChange( self, BackgroundWorker.IDLE )
 
   return self
+}
+
+function setupChildProcess( self ) {
+  self._childProcess = child_process.fork( path.join(__dirname, './nodeworker.js') )
+  for( var i = 0; i < self.definitions.length; i++ ) {
+    if( typeof self.definitions[i].val === 'function' ) {
+      self.definitions[i].val = self.definitions[i].val.toString()
+    }
+    self._childProcess.send({ command: 'define', args: [self.definitions[i]], messageId: getUniqueMessageId(self) })
+  }
+  self._childProcess.on( 'message', function( message ) {
+    childProcessOnMessageHandler( self, message )
+  })
+}
+
+function childProcessOnMessageHandler( self, message ) {
+  var data, messagehandler
+
+  data = message
+  messagehandler = self._messagehandlers[ data.messageId ]
+
+  if( data.exception ) {
+    return messagehandler.reject( createExceptionFromMessage( self, data.exception ) )
+  }
+
+  messagehandler.resolve( data.result )
 }
 
 /*
@@ -251,10 +320,8 @@ function setupIframe( self ) {
 
 
     self.onmessage = function( event ) {
-      var data = JSON.parse(event.data);
+      var data = event.data
       loadScripts(function() {
-        if( data.result )
-        return
         try {
           var result = definitions[data.command].apply(this, data.args);
           var out = { messageId: data.messageId, result: result };
@@ -322,8 +389,9 @@ function workerOnMessageHandler( self, event ) {
 
   messagehandler = self._messagehandlers[ data.messageId ]
 
-  if( data.exception )
+  if( data.exception ) {
     return messagehandler.reject( createExceptionFromMessage( self, data.exception ) )
+  }
 
   messagehandler.resolve( data.result )
 }
@@ -364,7 +432,12 @@ function createExceptionFromMessage( self, exception ) {
   var type, message
 
   try {
-    type = typeof global[exception.type] == 'function' ? global[exception.type] : Error
+    if( isNode ) {
+      type = eval( exception.type )
+    }
+    else {
+      type = typeof global[exception.type] == 'function' ? global[exception.type] : Error
+    }
   }
   catch( exception ) {
     type = Error
@@ -373,6 +446,23 @@ function createExceptionFromMessage( self, exception ) {
   message = exception.message
 
   return new type( message )
+}
+
+/*
+* Memoize a function
+* @private
+* @function
+*/
+function memoize( fn ) {
+  var _placeholder = {}
+  var cache = _placeholder
+  return function() {
+    if( cache !== _placeholder ) {
+      return cache
+    }
+    cache = fn.apply( null, arguments )
+    return cache
+  }
 }
 
 /*
@@ -424,9 +514,9 @@ function getWorkerSourcecode( self ) {
     src += " definitions['" + self.definitions[i].key + "'] = " + self.definitions[i].val + ";\n"
   }
 
-  src += "self.onmessage = function( event ) {  " +
-           "var data = JSON.parse(event.data);" +
+  src += "self.onmessage = function( event ) { " +
            "try {" +
+              "var data = event.data;" +
               "var result = definitions[data.command].apply(this, data.args);" +
               "var out = { messageId: data.messageId, result: result };" +
               "this.postMessage( JSON.stringify(out) );" +
