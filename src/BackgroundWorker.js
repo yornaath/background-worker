@@ -145,6 +145,11 @@ BackgroundWorker.prototype.run = function( command, args ) {
   return task
 }
 
+/*
+* PostMessage to the underlying Worker implementation
+* @private
+* @function
+*/
 function postMessage( self, message, domain ) {
   if( isNode ) {
     self._childProcess.send( message )
@@ -202,6 +207,7 @@ var global = typeof global !== 'undefined' ? global :
 * Start the worker
 * @private
 * @function
+* @param {BackgroundWorker} self
 */
 function start( self ) {
   if( self._isStarted ) {
@@ -225,36 +231,11 @@ function start( self ) {
   return self
 }
 
-function setupChildProcess( self ) {
-  self._childProcess = child_process.fork( path.join(__dirname, './nodeworker.js') )
-  for( var i = 0; i < self.definitions.length; i++ ) {
-    if( typeof self.definitions[i].val === 'function' ) {
-      self.definitions[i].val = self.definitions[i].val.toString()
-    }
-    self._childProcess.send({ command: 'define', args: [self.definitions[i]], messageId: getUniqueMessageId(self) })
-  }
-  self._childProcess.on( 'message', function( message ) {
-    childProcessOnMessageHandler( self, message )
-  })
-}
-
-function childProcessOnMessageHandler( self, message ) {
-  var data, messagehandler
-
-  data = message
-  messagehandler = self._messagehandlers[ data.messageId ]
-
-  if( data.exception ) {
-    return messagehandler.reject( createExceptionFromMessage( self, data.exception ) )
-  }
-
-  messagehandler.resolve( data.result )
-}
-
 /*
 * Setup a Worker
 * @private
 * @function
+* @param {BackgroundWorker} self
 */
 function setupWebWorker( self ) {
   self.blob = new Blob([
@@ -270,6 +251,26 @@ function setupWebWorker( self ) {
     return workerOnErrorHandler( self, event )
   }
 }
+
+/*
+* Setup a Process
+* @private
+* @function
+* @param {BackgroundWorker} self
+*/
+function setupChildProcess( self ) {
+  self._childProcess = child_process.fork( path.join(__dirname, './nodeworker.js') )
+  for( var i = 0; i < self.definitions.length; i++ ) {
+    if( typeof self.definitions[i].val === 'function' ) {
+      self.definitions[i].val = self.definitions[i].val.toString()
+    }
+    self._childProcess.send({ command: 'define', args: [self.definitions[i]], messageId: getUniqueMessageId(self) })
+  }
+  self._childProcess.on( 'message', function( message ) {
+    childProcessOnMessageHandler( self, message )
+  })
+}
+
 
 /*
 * Setup a Iframe
@@ -381,6 +382,8 @@ function stateChange( self, newstate ) {
  * @public
  * @function
  * @event
+ * @param {BackgroundWorker} self
+ * @param {Object} message
 */
 function workerOnMessageHandler( self, event ) {
   var data, messagehandler
@@ -397,10 +400,33 @@ function workerOnMessageHandler( self, event ) {
 }
 
 /*
+* Handle worker messages
+* @public
+* @function
+* @event
+* @param {BackgroundWorker} self
+* @param {Object} message
+*/
+function childProcessOnMessageHandler( self, message ) {
+  var data, messagehandler
+
+  data = message
+  messagehandler = self._messagehandlers[ data.messageId ]
+
+  if( data.exception ) {
+    return messagehandler.reject( createExceptionFromMessage( self, data.exception ) )
+  }
+
+  messagehandler.resolve( data.result )
+}
+
+/*
  * Handle iframe messages
  * @public
  * @function
  * @event
+ * @param {BackgroundWorker} self
+ * @param {Object} message
 */
  function iframeOnMessageHandler( self, event ) {
   var data, messagehandler
