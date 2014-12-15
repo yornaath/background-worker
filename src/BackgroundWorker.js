@@ -4,7 +4,7 @@ var Promise           = require( 'bluebird' ),
     path              = require( 'path' ),
     child_process     = require( 'child_process' ),
     isNode            = require( 'detect-node' ),
-    inherits          = require( 'util' ) .inherits,
+    inherits          = require( 'util' ).inherits,
     EventEmitter      = require( 'events' ).EventEmitter
 
 
@@ -227,7 +227,7 @@ function postMessage( self, message, domain ) {
     self._worker.postMessage( message )
   }
   else {
-    self._iframe.contentWindow.postMessage( message, self.domain )
+    self._iframe.contentWindow.postMessage( message, domain )
   }
 }
 
