@@ -96,6 +96,12 @@ function TestSharedAPI(){
         expect( worker._state ).to.eql( BackgroundWorker.CREATED )
       })
 
+      it('Should be BackgroundWorker.TERMINATED for workers terminated', function() {
+        var worker = new BackgroundWorker()
+        worker.terminate()
+        expect( worker._state ).to.eql( BackgroundWorker.TERMINATED )
+      })
+
       it('Should be BackgroundWorker.IDLE for started workers', function() {
         var worker = new BackgroundWorker()
         worker._start()
