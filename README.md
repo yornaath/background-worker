@@ -1,4 +1,4 @@
-background-worker
+background-worker ![](https://api.travis-ci.org/gorillatron/background-worker.svg)
 =========
 
 ### Usage
