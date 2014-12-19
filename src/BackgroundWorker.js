@@ -251,7 +251,7 @@ function setupWebWorker( self ) {
 * @param {BackgroundWorker} self
 */
 function setupChildProcess( self ) {
-  self._childProcess = child_process.fork( './nodeworker.js' )
+  self._childProcess = child_process.fork( __dirname + '/nodeworker.js' )
   for( var i = 0; i < self.definitions.length; i++ ) {
     if( typeof self.definitions[i].val === 'function' ) {
       self.definitions[i].val = self.definitions[i].val.toString()
