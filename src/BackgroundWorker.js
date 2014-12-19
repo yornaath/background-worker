@@ -1,22 +1,16 @@
 "use strict";
 
-var Promise           = require( 'bluebird' ),
-    path              = require( 'path' ),
-    child_process     = require( 'child_process' ),
-    isNode            = require( 'detect-node' ),
-    inherits          = require( 'util' ).inherits,
-    EventEmitter      = require( 'events' ).EventEmitter
+var child_process     = require( 'child_process' ),
+    isNode            = require( 'detect-node' )
 
 
 module.exports = BackgroundWorker
 
 /*
  * @class BackgroundWorker
- * @extends EventEmitter
  * @author Jørn Andre Tangen @gorillatron
 */
 function BackgroundWorker( spec ) {
-  EventEmitter.apply( this, arguments )
 
   spec = spec ? spec : {}
 
@@ -35,8 +29,6 @@ function BackgroundWorker( spec ) {
     this.define('default', spec )
   }
 }
-
-inherits( BackgroundWorker, EventEmitter )
 
 /*
  * Check WebWorker support
@@ -259,7 +251,7 @@ function setupWebWorker( self ) {
 * @param {BackgroundWorker} self
 */
 function setupChildProcess( self ) {
-  self._childProcess = child_process.fork( path.join(__dirname, './nodeworker.js') )
+  self._childProcess = child_process.fork( './nodeworker.js' )
   for( var i = 0; i < self.definitions.length; i++ ) {
     if( typeof self.definitions[i].val === 'function' ) {
       self.definitions[i].val = self.definitions[i].val.toString()
@@ -326,11 +318,11 @@ function setupIframe( self ) {
         try {
           var result = definitions[data.command].apply(this, data.args);
           var out = { messageId: data.messageId, result: result };
-          postMessage( JSON.stringify(out), domain );
+          postMessage( out, domain );
         }
         catch( exception ) {
           var message = { messageId: data.messageId, exception: { type: exception.name, message: exception.message } };
-          postMessage( JSON.stringify(message), domain );
+          postMessage( message, domain );
         }
       })
     }
@@ -370,8 +362,8 @@ function stateChange( self, newstate ) {
   self._state = newstate
 
   if( oldstate !== newstate ) {
-    self.emit( 'statechange:' + newstate )
-    self.emit( 'statechange', newstate )
+    // self.emit( 'statechange:' + newstate )
+    // self.emit( 'statechange', newstate )
     return true
   }
 
@@ -389,7 +381,7 @@ function stateChange( self, newstate ) {
 function workerOnMessageHandler( self, event ) {
   var data, messagehandler
 
-  data = JSON.parse( event.data )
+  data = event.data
 
   messagehandler = self._messagehandlers[ data.messageId ]
 
@@ -432,7 +424,7 @@ function childProcessOnMessageHandler( self, message ) {
  function iframeOnMessageHandler( self, event ) {
   var data, messagehandler
 
-  data = JSON.parse( event.data )
+  data = event.data
 
   if(data.command) return null
 
@@ -546,11 +538,11 @@ function getWorkerSourcecode( self ) {
               "var data = event.data;" +
               "var result = definitions[data.command].apply(this, data.args);" +
               "var out = { messageId: data.messageId, result: result };" +
-              "this.postMessage( JSON.stringify(out) );" +
+              "this.postMessage( out );" +
            "}" +
            "catch( exception ) {" +
              "var message = { messageId: data.messageId, exception: { type: exception.name, message: exception.message } };" +
-             "this.postMessage(JSON.stringify(message));" +
+             "this.postMessage(message);" +
            "}" +
          "};"
 

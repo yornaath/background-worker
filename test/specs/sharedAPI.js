@@ -97,7 +97,7 @@ module.exports = function sharedAPI(){
       var worker = new BackgroundWorker()
       worker.define( 'fn', "function(){ return 'wat' }" )
       expect( worker._state ).to.eql( BackgroundWorker.CREATED )
-      worker.run('fn').finally( done )
+      worker.run('fn').then(function(){ done() })
       expect( worker._state ).to.eql( BackgroundWorker.RUNNING )
     })
 
@@ -105,7 +105,7 @@ module.exports = function sharedAPI(){
       var worker = new BackgroundWorker()
       worker.define( 'fn', "function(){ return 'wat' }" )
       expect( worker._state ).to.eql( BackgroundWorker.CREATED )
-      worker.run('fn').finally(function() {
+      worker.run('fn').then(function() {
         expect( worker._state ).to.eql( BackgroundWorker.IDLE )
         done()
       })
