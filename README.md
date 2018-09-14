@@ -7,9 +7,9 @@ var BackgroundWorker = require( 'background-worker' )
 
 var worker = new BackgroundWorker()
 
-worker.define( 'add', ( a, b ) ->  a + b )
+worker.define( 'add', ( a, b ) =>  a + b )
 
-worker.run( 'add', [1, 2] ).then((res) -> {
+worker.run( 'add', [1, 2] ).then((res) => {
   res === 3
 })
 .finally( () -> worker.terminate() )
